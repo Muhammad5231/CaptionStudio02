@@ -1,0 +1,66 @@
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+from app.core.database import get_db
+from app.models.models import ProjectModel
+from app.services.transcription.whisper_provider import whisper_provider
+
+router = APIRouter(prefix="/projects", tags=["transcription"])
+
+@router.post("/{project_id}/transcribe")
+async def transcribe_project(
+    project_id: str,
+    db: Session = Depends(get_db)
+):
+    project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+
+    if not project.video_path:
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a video file first before transcribing."
+        )
+
+    project.status = "transcribing"
+    db.commit()
+
+    try:
+        result = await whisper_provider.transcribe(project.video_path)
+        segments = result.get("segments", [])
+        
+        # If whisper found no speech in silent video, provide friendly initial prompt
+        if not segments:
+            segments = [
+                {
+                    "id": "seg-1",
+                    "start": 0.5,
+                    "end": min(3.5, max(1.5, project.duration or 3.0)),
+                    "text": "Add your first caption here",
+                    "words": [
+                        {"text": "Add", "start": 0.5, "end": 1.0, "confidence": 1.0},
+                        {"text": "your", "start": 1.0, "end": 1.5, "confidence": 1.0},
+                        {"text": "first", "start": 1.5, "end": 2.2, "confidence": 1.0},
+                        {"text": "caption", "start": 2.2, "end": 2.9, "confidence": 1.0},
+                        {"text": "here", "start": 2.9, "end": 3.4, "confidence": 1.0}
+                    ]
+                }
+            ]
+
+        project.captions = segments
+        project.status = "ready"
+        db.commit()
+        db.refresh(project)
+
+        return {
+            "message": "Captions generated successfully",
+            "segments_count": len(segments),
+            "captions": segments
+        }
+    except Exception as e:
+        project.status = "ready"
+        db.commit()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Transcription failed: {str(e)}"
+        )
+
