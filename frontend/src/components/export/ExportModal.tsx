@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { api } from '../../services/api';
-import { Download, X, CheckCircle2, AlertCircle, RefreshCw, Film } from 'lucide-react';
+import { Download, X, CheckCircle2, AlertCircle, RefreshCw, Film, ExternalLink } from 'lucide-react';
 import type { ExportJob } from '../../types/caption';
 
 export const ExportModal: React.FC = () => {
@@ -12,6 +12,8 @@ export const ExportModal: React.FC = () => {
   const [isExporting, setIsExporting] = useState(false);
   const [job, setJob] = useState<ExportJob | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const [hasDownloaded, setHasDownloaded] = useState(false);
 
   const pollIntervalRef = useRef<any>(null);
 
@@ -28,6 +30,7 @@ export const ExportModal: React.FC = () => {
     try {
       setIsExporting(true);
       setErrorMsg(null);
+      setHasDownloaded(false);
 
       const newJob = await api.startExport(currentProject.id, quality, captionQuality);
       setJob(newJob);
@@ -55,22 +58,11 @@ export const ExportModal: React.FC = () => {
     }
   };
 
-  const handleDownload = () => {
-    if (!job) return;
-    const downloadUrl = `/api/download/${job.id}`;
-    const filename = job.output_filename || `captionstudio_${job.id.slice(0, 8)}.mp4`;
-    const link = document.createElement('a');
-    link.href = downloadUrl;
-    link.setAttribute('download', filename);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   const handleCreateAnother = () => {
     setExportModalOpen(false);
     setIsExporting(false);
     setJob(null);
+    setHasDownloaded(false);
     setUploadModalOpen(true);
   };
 
@@ -172,7 +164,7 @@ export const ExportModal: React.FC = () => {
             {/* Export Action */}
             <button
               onClick={handleStartExport}
-              className="w-full py-3 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 cursor-pointer transition hover:scale-[1.01]"
+              className="w-full py-3 rounded-xl bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 flex items-center justify-center gap-2 cursor-pointer transition hover:scale-[1.01]"
             >
               <Download className="w-4 h-4" />
               <span>Export Video</span>
@@ -200,7 +192,7 @@ export const ExportModal: React.FC = () => {
             <div className="w-full space-y-2">
               <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5">
                 <div
-                  className="h-full bg-gradient-to-r from-sky-500 to-indigo-500 rounded-full transition-all duration-300"
+                  className="h-full bg-linear-to-r from-sky-500 to-indigo-500 rounded-full transition-all duration-300"
                   style={{ width: `${job?.progress || 10}%` }}
                 />
               </div>
@@ -226,35 +218,60 @@ export const ExportModal: React.FC = () => {
               </p>
             </div>
 
-            <div className="w-full space-y-2 pt-2">
+            <div className="w-full space-y-3 pt-2">
+              {/* Primary Download Anchor Button */}
               <a
                 href={`/api/download/${job.id}`}
-                download={job.output_filename || `captionstudio_${job.id.slice(0, 8)}.mp4`}
-                onClick={() => {
-                  handleDownload();
-                }}
-                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer no-underline"
+                download={job.output_filename || job.output_url?.split('/').pop() || `captionstudio_${job.id.slice(0, 8)}.mp4`}
+                onClick={() => setHasDownloaded(true)}
+                className={`w-full py-3.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer no-underline select-none ${
+                  hasDownloaded
+                    ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-500'
+                    : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
+                }`}
               >
-                <Download className="w-4 h-4" />
-                <span>Download Video</span>
+                {hasDownloaded ? (
+                  <>
+                    <CheckCircle2 className="w-4 h-4 text-emerald-200" />
+                    <span>Download Started! Click to download again</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Download Video (MP4)</span>
+                  </>
+                )}
               </a>
 
+              {/* Watch / Preview Video Button */}
               {job.output_url && (
-                <div className="text-center pt-1">
+                <a
+                  href={job.output_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 text-xs font-semibold border border-slate-800 flex items-center justify-center gap-2 transition no-underline"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Preview Video in New Tab</span>
+                </a>
+              )}
+
+              {/* Direct static file download link */}
+              {job.output_url && (
+                <div className="text-center pt-0.5">
                   <a
                     href={job.output_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[11px] text-sky-400 hover:text-sky-300 underline font-medium"
+                    download={job.output_filename || job.output_url?.split('/').pop() || `captionstudio_${job.id.slice(0, 8)}.mp4`}
+                    className="text-[11px] text-slate-400 hover:text-slate-200 underline font-medium"
                   >
-                    Direct link: Open or right-click to save
+                    Direct static link (right-click &quot;Save link as&quot;)
                   </a>
                 </div>
               )}
 
               <button
                 onClick={handleCreateAnother}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition cursor-pointer"
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition cursor-pointer mt-2"
               >
                 Create Another Video
               </button>

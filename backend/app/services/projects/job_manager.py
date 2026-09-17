@@ -13,7 +13,10 @@ class JobManager:
     @staticmethod
     def get_job(db: Session, job_id: str) -> ExportJobModel:
         db.expire_all()
-        return db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
+        job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
+        if not job and len(job_id) >= 6:
+            job = db.query(ExportJobModel).filter(ExportJobModel.id.startswith(job_id)).first()
+        return job
 
     @staticmethod
     def create_job(db: Session, project_id: str) -> ExportJobModel:

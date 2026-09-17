@@ -89,6 +89,7 @@ class ExportJobResponse(BaseModel):
     status: str
     progress: int
     current_stage: str
+    output_filename: Optional[str] = None
     output_url: Optional[str] = None
     error: Optional[str] = None
     created_at: datetime

@@ -55,7 +55,6 @@ def download_rendered_video(job_id: str, db: Session = Depends(get_db)):
         filename=filename,
         media_type="video/mp4",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
             "Access-Control-Expose-Headers": "Content-Disposition"
         }
     )
