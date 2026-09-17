@@ -9,11 +9,11 @@ export const api = {
     return res.json();
   },
 
-  async createProject(name: string = 'Untitled Video', stylePreset: string = 'Modern'): Promise<Project> {
+  async createProject(name: string = 'Untitled Video', stylePreset: string = 'Hormozi', aspectRatio: string = '9:16'): Promise<Project> {
     const res = await fetch(`${API_BASE}/projects`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, style_preset: stylePreset }),
+      body: JSON.stringify({ name, style_preset: stylePreset, aspect_ratio: aspectRatio }),
     });
     if (!res.ok) throw new Error('Failed to create project');
     return res.json();
@@ -67,10 +67,15 @@ export const api = {
     return res.json();
   },
 
-  async uploadSubtitles(id: string, file: File): Promise<any> {
+  async importSubtitles(id: string, file: File): Promise<{
+    success: boolean;
+    format: string;
+    segment_count: number;
+    captions: any[];
+  }> {
     const formData = new FormData();
     formData.append('file', file);
-    const res = await fetch(`${API_BASE}/projects/${id}/subtitles`, {
+    const res = await fetch(`${API_BASE}/projects/${id}/subtitles/import`, {
       method: 'POST',
       body: formData,
     });
@@ -81,11 +86,41 @@ export const api = {
     return res.json();
   },
 
-  async transcribeProject(id: string): Promise<any> {
-    const res = await fetch(`${API_BASE}/projects/${id}/transcribe`, { method: 'POST' });
+  async uploadSubtitles(id: string, file: File): Promise<any> {
+    return this.importSubtitles(id, file);
+  },
+
+  async transcribeProject(id: string, language: string = 'auto'): Promise<any> {
+    const query = language && language !== 'auto' ? `?language=${encodeURIComponent(language)}` : '';
+    const res = await fetch(`${API_BASE}/projects/${id}/transcribe${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ language })
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ detail: 'Transcription failed' }));
       throw new Error(err.detail || 'Transcription failed');
+    }
+    return res.json();
+  },
+
+  async translateCaptions(id: string, targetLanguage: string, sourceLanguage?: string): Promise<{
+    success: boolean;
+    target_language: string;
+    captions: any[];
+    engine_used?: string;
+  }> {
+    const res = await fetch(`${API_BASE}/projects/${id}/translate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        target_language: targetLanguage,
+        source_language: sourceLanguage || 'auto'
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Translation failed' }));
+      throw new Error(err.detail || 'Translation failed');
     }
     return res.json();
   },

@@ -1,21 +1,31 @@
 import React, { useEffect } from 'react';
 import { useProjectStore } from '../store/useProjectStore';
-import { VideoPreview } from '../components/preview/VideoPreview';
-import { StylePresetCards } from '../components/styles/StylePresetCards';
-import { CaptionTimeline } from '../components/timeline/CaptionTimeline';
-import { CustomizeDrawer } from '../components/customize/CustomizeDrawer';
+import { LeftSidebar } from '../components/studio/LeftSidebar';
+import { CenterCanvas } from '../components/studio/CenterCanvas';
+import { StyleInspector } from '../components/studio/StyleInspector';
 import { ExportModal } from '../components/export/ExportModal';
 import { AutoStyleModal } from '../components/styles/AutoStyleModal';
+import { initGlobalFonts } from '../services/fontLoader';
 
 export const EditorPage: React.FC = () => {
   const { currentProject, undo, redo, isPlaying, setIsPlaying } = useProjectStore();
 
-  // Keyboard Shortcuts: Ctrl+Z (undo), Ctrl+Shift+Z / Ctrl+Y (redo), Space (play/pause)
+  // Preload essential Google Web Fonts
+  useEffect(() => {
+    initGlobalFonts();
+  }, []);
+
+  // Global Studio Keyboard Shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Don't trigger if user is typing in an input or textarea
+      // Don't trigger when user is typing in an input or textarea
       const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+      if (
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT' ||
+        target.isContentEditable
+      ) {
         return;
       }
 
@@ -43,18 +53,17 @@ export const EditorPage: React.FC = () => {
   if (!currentProject) return null;
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] bg-[#080C14] text-slate-100 flex flex-col items-center px-4 sm:px-6 py-6 space-y-4">
-      {/* 1. Large Center Video Preview (The visual focus) */}
-      <VideoPreview />
+    <div className="h-[calc(100vh-4rem)] bg-[#080C14] text-slate-100 flex overflow-hidden w-full select-none">
+      {/* 1. Left Panel: Subtitles, Manual Ingestion (.srt/.vtt/.ass), & AI Translation */}
+      <LeftSidebar />
 
-      {/* 2. Visual Style Preset Cards (Modern, Bold, Minimal, Viral, Cinematic, Clean) */}
-      <StylePresetCards />
+      {/* 2. Center Panel: Production Viewport, Aspect Ratio Switcher, Live Canvas, & Timeline Scrubber */}
+      <CenterCanvas />
 
-      {/* 3. Caption Transcript & Simple Timeline */}
-      <CaptionTimeline />
+      {/* 3. Right Panel: Style Inspector with 5 Viral Presets, Typography, Highlights, & Safe Zones */}
+      <StyleInspector />
 
-      {/* Modals & Drawers */}
-      <CustomizeDrawer />
+      {/* Modals */}
       <ExportModal />
       <AutoStyleModal />
     </div>

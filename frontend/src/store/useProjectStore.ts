@@ -16,6 +16,7 @@ interface ProjectState {
   isExportModalOpen: boolean;
   isUploadModalOpen: boolean;
   isAutoStyleOpen: boolean;
+  activeLeftTab: 'transcript' | 'import' | 'translate';
   currentView: 'landing' | 'dashboard' | 'editor';
 
   // History for Undo / Redo
@@ -30,6 +31,9 @@ interface ProjectState {
   setIsPlaying: (playing: boolean) => void;
   setPlaybackRate: (rate: number) => void;
   setActiveSegmentId: (id: string | null) => void;
+  setActiveLeftTab: (tab: 'transcript' | 'import' | 'translate') => void;
+  setAspectRatio: (ratio: '9:16' | '16:9' | '1:1') => void;
+  setCaptions: (captions: CaptionSegment[]) => void;
   
   // Modals / Drawers
   setCustomizeOpen: (open: boolean) => void;
@@ -69,6 +73,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isExportModalOpen: false,
   isUploadModalOpen: false,
   isAutoStyleOpen: false,
+  activeLeftTab: 'transcript',
   currentView: 'landing',
 
   history: [],
@@ -81,6 +86,27 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   setIsPlaying: (playing) => set({ isPlaying: playing }),
   setPlaybackRate: (rate) => set({ playbackRate: rate }),
   setActiveSegmentId: (id) => set({ activeSegmentId: id }),
+  setActiveLeftTab: (tab) => set({ activeLeftTab: tab }),
+
+  setAspectRatio: (ratio) => {
+    const { currentProject, pushHistory } = get();
+    if (!currentProject) return;
+    pushHistory();
+    const updated = {
+      ...currentProject,
+      aspect_ratio: ratio,
+    };
+    set({ currentProject: updated });
+    get().saveProject();
+  },
+
+  setCaptions: (captions) => {
+    const { currentProject, pushHistory } = get();
+    if (!currentProject) return;
+    pushHistory();
+    set({ currentProject: { ...currentProject, captions } });
+    get().saveProject();
+  },
 
   setCustomizeOpen: (open) => set({ isCustomizeOpen: open }),
   setExportModalOpen: (open) => set({ isExportModalOpen: open }),

@@ -14,6 +14,7 @@ export interface CaptionSegment {
 }
 
 export interface StyleConfig {
+  preset?: string;
   name?: string;
   description?: string;
   font_family: string;
@@ -27,11 +28,11 @@ export interface StyleConfig {
 
   // Active word highlight
   highlight_color: string;
-  highlight_style: 'color' | 'box' | 'scale' | 'underline' | 'glow';
+  highlight_style: 'color' | 'box' | 'scale' | 'underline' | 'glow' | 'karaoke';
   highlight_bg_color: string;
 
   // Word Animation
-  animation: 'none' | 'smooth' | 'pop' | 'bounce' | 'wave';
+  animation: 'none' | 'smooth' | 'pop' | 'bounce' | 'wave' | 'hormozi' | 'glow' | 'karaoke';
 
   // Background
   background_style: 'none' | 'box' | 'rounded_box';
@@ -60,6 +61,7 @@ export interface Project {
   width: number;
   height: number;
   fps: number;
+  aspect_ratio?: '9:16' | '16:9' | '1:1';
   style_preset: string;
   style_config: StyleConfig;
   captions: CaptionSegment[];
@@ -74,6 +76,7 @@ export interface ExportJob {
   status: 'queued' | 'processing' | 'completed' | 'failed';
   progress: number;
   current_stage: string;
+  output_filename?: string;
   output_url?: string;
   error?: string;
   created_at: string;
@@ -88,4 +91,3 @@ export interface Template {
   preview_text: string;
   style_config: StyleConfig;
 }
-

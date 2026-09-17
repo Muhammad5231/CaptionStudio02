@@ -57,7 +57,14 @@ export const ExportModal: React.FC = () => {
 
   const handleDownload = () => {
     if (!job) return;
-    window.open(`/api/download/${job.id}`, '_blank');
+    const downloadUrl = `/api/download/${job.id}`;
+    const filename = job.output_filename || `captionstudio_${job.id.slice(0, 8)}.mp4`;
+    const link = document.createElement('a');
+    link.href = downloadUrl;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   const handleCreateAnother = () => {
@@ -220,17 +227,34 @@ export const ExportModal: React.FC = () => {
             </div>
 
             <div className="w-full space-y-2 pt-2">
-              <button
-                onClick={handleDownload}
-                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer"
+              <a
+                href={`/api/download/${job.id}`}
+                download={job.output_filename || `captionstudio_${job.id.slice(0, 8)}.mp4`}
+                onClick={() => {
+                  handleDownload();
+                }}
+                className="w-full py-3 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer no-underline"
               >
                 <Download className="w-4 h-4" />
                 <span>Download Video</span>
-              </button>
+              </a>
+
+              {job.output_url && (
+                <div className="text-center pt-1">
+                  <a
+                    href={job.output_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[11px] text-sky-400 hover:text-sky-300 underline font-medium"
+                  >
+                    Direct link: Open or right-click to save
+                  </a>
+                </div>
+              )}
 
               <button
                 onClick={handleCreateAnother}
-                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition"
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-semibold border border-slate-800 transition cursor-pointer"
               >
                 Create Another Video
               </button>

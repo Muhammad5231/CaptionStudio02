@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.models.models import ProjectModel
@@ -6,9 +8,14 @@ from app.services.transcription.whisper_provider import whisper_provider
 
 router = APIRouter(prefix="/projects", tags=["transcription"])
 
+class TranscribeRequest(BaseModel):
+    language: Optional[str] = "auto"
+
 @router.post("/{project_id}/transcribe")
 async def transcribe_project(
     project_id: str,
+    req: Optional[TranscribeRequest] = None,
+    language: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
@@ -24,10 +31,12 @@ async def transcribe_project(
     project.status = "transcribing"
     db.commit()
 
+    chosen_lang = (req.language if req and req.language else None) or language or "auto"
+
     try:
-        result = await whisper_provider.transcribe(project.video_path)
+        result = await whisper_provider.transcribe(project.video_path, language=chosen_lang)
         segments = result.get("segments", [])
-        
+
         # If whisper found no speech in silent video, provide friendly initial prompt
         if not segments:
             segments = [
@@ -53,6 +62,7 @@ async def transcribe_project(
 
         return {
             "message": "Captions generated successfully",
+            "language": chosen_lang,
             "segments_count": len(segments),
             "captions": segments
         }
@@ -63,4 +73,3 @@ async def transcribe_project(
             status_code=500,
             detail=f"Transcription failed: {str(e)}"
         )
-

@@ -12,6 +12,7 @@ from app.api.transcription import router as transcription_router
 from app.api.templates import router as templates_router
 from app.api.export import router as export_router
 from app.api.demo import router as demo_router
+from app.api.translate import router as translate_router
 
 from contextlib import asynccontextmanager
 import threading
@@ -62,6 +63,7 @@ app.include_router(transcription_router, prefix=settings.API_V1_STR)
 app.include_router(templates_router, prefix=settings.API_V1_STR)
 app.include_router(export_router, prefix=settings.API_V1_STR)
 app.include_router(demo_router, prefix=settings.API_V1_STR)
+app.include_router(translate_router, prefix=settings.API_V1_STR)
 
 @app.get("/api/health")
 def health_check():

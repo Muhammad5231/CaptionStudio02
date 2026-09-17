@@ -12,7 +12,7 @@ from app.services.subtitle_parser.parser import subtitle_parser
 router = APIRouter(prefix="/projects", tags=["upload"])
 
 ALLOWED_VIDEO_EXTENSIONS = {".mp4", ".mov", ".webm", ".mkv", ".m4v"}
-ALLOWED_SUBTITLE_EXTENSIONS = {".srt", ".vtt", ".txt"}
+ALLOWED_SUBTITLE_EXTENSIONS = {".srt", ".vtt", ".ass", ".txt"}
 
 @router.post("/{project_id}/upload")
 async def upload_video(
@@ -46,7 +46,7 @@ async def upload_video(
 
     # Probe metadata
     meta = ffmpeg_wrapper.probe_video(str(save_path))
-    
+
     # Generate thumbnail
     thumb_name = f"{project_id}_thumb.jpg"
     thumb_path = settings.THUMBNAIL_DIR / thumb_name
@@ -62,7 +62,7 @@ async def upload_video(
     project.height = meta["height"]
     project.fps = meta["fps"]
     project.status = "ready"
-    
+
     db.commit()
     db.refresh(project)
 
@@ -76,12 +76,7 @@ async def upload_video(
         "fps": project.fps
     }
 
-@router.post("/{project_id}/subtitles")
-async def upload_subtitles(
-    project_id: str,
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db)
-):
+async def _process_subtitle_upload(project_id: str, file: UploadFile, db: Session):
     project = db.query(ProjectModel).filter(ProjectModel.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -90,7 +85,7 @@ async def upload_subtitles(
     if ext not in ALLOWED_SUBTITLE_EXTENSIONS:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format {ext}. Please upload an SRT, VTT, or TXT file."
+            detail=f"Unsupported format {ext}. Please upload an SRT, VTT, or ASS file."
         )
 
     try:
@@ -118,3 +113,18 @@ async def upload_subtitles(
         "captions": parsed_segments
     }
 
+@router.post("/{project_id}/subtitles")
+async def upload_subtitles(
+    project_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    return await _process_subtitle_upload(project_id, file, db)
+
+@router.post("/{project_id}/subtitles/import")
+async def import_subtitles(
+    project_id: str,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db)
+):
+    return await _process_subtitle_upload(project_id, file, db)

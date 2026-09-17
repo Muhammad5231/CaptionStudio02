@@ -159,3 +159,68 @@ def test_frontend_serving():
     assert response.status_code == 200
     assert "CaptionStudio" in response.text
 
+def test_subtitle_parser_vtt_ass():
+    vtt_data = """WEBVTT
+
+00:00:01.000 --> 00:00:03.000
+Viral reels captioning
+
+00:00:03.500 --> 00:00:05.500
+Made simple and fast
+"""
+    vtt_segments = subtitle_parser.parse(vtt_data, filename="sample.vtt")
+    assert len(vtt_segments) == 2
+    assert vtt_segments[0]["text"] == "Viral reels captioning"
+    assert len(vtt_segments[0]["words"]) == 3
+
+    ass_data = """[Script Info]
+Title: Sample
+ScriptType: v4.00+
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.00,0:00:03.00,Default,,0,0,0,,{\\k50}Super {\\k60}Fast {\\k70}Captions
+"""
+    ass_segments = subtitle_parser.parse(ass_data, filename="sample.ass")
+    assert len(ass_segments) == 1
+    assert "Super Fast Captions" in ass_segments[0]["text"]
+    assert len(ass_segments[0]["words"]) == 3
+
+def test_translation_api():
+    # Create project
+    proj = client.post("/api/projects", json={"name": "Translate Test", "aspect_ratio": "9:16"}).json()
+    p_id = proj["id"]
+
+    # Set captions
+    captions = [
+        {
+            "id": "seg-1",
+            "start": 0.0,
+            "end": 2.0,
+            "text": "Hello world welcome to our video",
+            "words": [
+                {"text": "Hello", "start": 0.0, "end": 0.4},
+                {"text": "world", "start": 0.4, "end": 0.8},
+                {"text": "welcome", "start": 0.8, "end": 1.2},
+                {"text": "to", "start": 1.2, "end": 1.4},
+                {"text": "our", "start": 1.4, "end": 1.6},
+                {"text": "video", "start": 1.6, "end": 2.0}
+            ]
+        }
+    ]
+    client.put(f"/api/projects/{p_id}", json={"captions": captions})
+
+    # Translate to Hindi
+    res = client.post(f"/api/projects/{p_id}/translate", json={"target_language": "hi"})
+    assert res.status_code == 200
+    res_data = res.json()
+    assert res_data["target_language"] == "hi"
+    assert len(res_data["captions"]) == 1
+    assert res_data["captions"][0]["id"] == "seg-1"
+    assert res_data["captions"][0]["start"] == 0.0
+    assert res_data["captions"][0]["end"] == 2.0
+    assert len(res_data["captions"][0]["words"]) > 0
+
+    # Clean up
+    client.delete(f"/api/projects/{p_id}")
+

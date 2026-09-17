@@ -1,0 +1,9 @@
+storage/**
+storage/*
+*.db
+*.db-journal
+*.db-wal
+*.ass
+*.mp4
+*.wav
+

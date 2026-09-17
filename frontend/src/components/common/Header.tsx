@@ -1,8 +1,10 @@
 import React from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
-import { Sparkles, Undo2, Redo2, Download, Video, FolderKanban, Wand2 } from 'lucide-react';
+import { useThemeStore } from '../../store/useThemeStore';
+import { Sparkles, Undo2, Redo2, Download, Video, FolderKanban, Wand2, Sun, Moon } from 'lucide-react';
 
 export const Header: React.FC = () => {
+  const { theme, toggleTheme } = useThemeStore();
   const {
     currentView,
     setCurrentView,
@@ -145,12 +147,25 @@ export const Header: React.FC = () => {
         {currentView !== 'editor' && (
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-pointer"
           >
             <Video className="w-4 h-4" />
             <span>Create Captions</span>
           </button>
         )}
+
+        {/* Theme Toggle (Dark / Light) */}
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-xl text-slate-400 hover:text-slate-200 bg-slate-900/60 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
+          title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+        >
+          {theme === 'dark' ? (
+            <Sun className="w-4 h-4 text-amber-400" />
+          ) : (
+            <Moon className="w-4 h-4 text-indigo-400" />
+          )}
+        </button>
       </div>
     </header>
   );

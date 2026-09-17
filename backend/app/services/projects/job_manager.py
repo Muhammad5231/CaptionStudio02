@@ -52,13 +52,17 @@ class JobManager:
             job.current_stage = "Analyzing video & timing..."
             db.commit()
 
-            # Stage 2: Generate ASS Subtitles
+            # Stage 2: Generate ASS Subtitles in system temp directory to prevent watcher restarts
             job.progress = 25
             job.current_stage = "Generating caption styles..."
             db.commit()
 
-            ass_filename = f"subtitles_{job_id}.ass"
-            ass_path = str(settings.STORAGE_DIR / ass_filename)
+            import tempfile
+            import time
+            import traceback
+
+            ass_filename = f"captionstudio_{job_id}.ass"
+            ass_path = str(Path(tempfile.gettempdir()) / ass_filename)
             
             ass_content = ass_generator.generate(
                 captions=project.captions or [],
@@ -74,15 +78,25 @@ class JobManager:
             out_filename = f"export_{job.project_id[:8]}_{int(datetime.utcnow().timestamp())}.mp4"
             out_path = str(settings.RENDER_DIR / out_filename)
 
+            last_update_time = [0.0]
+            last_pct = [0]
+
             def on_progress(pct: int, msg: str):
-                # Update job in fresh session
-                sub_db = SessionLocal()
-                j = sub_db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-                if j:
-                    j.progress = pct
-                    j.current_stage = msg
-                    sub_db.commit()
-                sub_db.close()
+                now = time.time()
+                # Throttle DB writes: only write if >= 2% change or 0.4s elapsed or 100%
+                if pct == 100 or abs(pct - last_pct[0]) >= 2 or (now - last_update_time[0]) >= 0.4:
+                    last_update_time[0] = now
+                    last_pct[0] = pct
+                    try:
+                        sub_db = SessionLocal()
+                        j = sub_db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
+                        if j:
+                            j.progress = pct
+                            j.current_stage = msg
+                            sub_db.commit()
+                        sub_db.close()
+                    except Exception as pe:
+                        print(f"[Warning] Failed to update progress in DB: {pe}")
 
             on_progress(35, "Rendering captions with FFmpeg...")
 
@@ -110,10 +124,24 @@ class JobManager:
             job.completed_at = datetime.utcnow()
             db.commit()
 
+        except asyncio.CancelledError:
+            print(f"[Export] Job {job_id} cancelled by server reload or shutdown")
+            try:
+                job.status = "failed"
+                job.error = "Video export was interrupted or cancelled. Please try again."
+                db.commit()
+            except Exception:
+                pass
+            raise
         except Exception as e:
+            traceback.print_exc()
+            err_msg = str(e).strip() or repr(e)
             job.status = "failed"
-            job.error = f"We encountered an issue while finalizing your video: {str(e)}"
-            db.commit()
+            job.error = f"We encountered an issue while finalizing your video: {err_msg}"
+            try:
+                db.commit()
+            except Exception:
+                pass
         finally:
             db.close()
 
