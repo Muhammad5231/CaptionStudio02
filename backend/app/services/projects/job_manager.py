@@ -92,30 +92,17 @@ class JobManager:
             ass_filename = f"captionstudio_{job_id}.ass"
             ass_path = str(Path(tempfile.gettempdir()) / ass_filename)
 
-            # Dimensions for ASS coordinates matching target export resolution
-            if quality == "720p":
-                if aspect_ratio == "9:16":
-                    ass_w, ass_h = (720, 1280)
-                elif aspect_ratio == "16:9":
-                    ass_w, ass_h = (1280, 720)
-                else:
-                    ass_w, ass_h = (720, 720)
+            # Dimensions for ASS coordinates
+            if aspect_ratio == "9:16":
+                ass_w, ass_h = (1080, 1920)
+            elif aspect_ratio == "16:9":
+                ass_w, ass_h = (1920, 1080)
             else:
-                if aspect_ratio == "9:16":
-                    ass_w, ass_h = (1080, 1920)
-                elif aspect_ratio == "16:9":
-                    ass_w, ass_h = (1920, 1080)
-                else:
-                    ass_w, ass_h = (1080, 1080)
+                ass_w, ass_h = (1080, 1080)
 
             if has_video and bg_type != "color":
-                probe = ffmpeg_wrapper.probe_video(project.video_path)
-                src_w = probe.get("width") or project.width or ass_w
-                src_h = probe.get("height") or project.height or ass_h
-                if quality == "720p":
-                    ass_w, ass_h = (720, int(round(720 * (src_h / src_w)))) if src_h > src_w else (int(round(720 * (src_w / src_h))), 720)
-                else:
-                    ass_w, ass_h = src_w, src_h
+                ass_w = project.width or ass_w
+                ass_h = project.height or ass_h
             
             ass_content = ass_generator.generate(
                 captions=project.captions or [],
