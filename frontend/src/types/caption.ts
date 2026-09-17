@@ -34,6 +34,10 @@ export interface StyleConfig {
   // Word Animation
   animation: 'none' | 'smooth' | 'pop' | 'bounce' | 'wave' | 'hormozi' | 'glow' | 'karaoke';
 
+  // Canvas / Chroma Background Mode
+  canvas_background_type?: 'video' | 'color';
+  canvas_background_color?: string; // e.g. '#00FF00' (Green Screen), '#000000', etc.
+
   // Background
   background_style: 'none' | 'box' | 'rounded_box';
   background_color: string;

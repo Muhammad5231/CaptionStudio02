@@ -104,13 +104,35 @@ async def _process_subtitle_upload(project_id: str, file: UploadFile, db: Sessio
             detail="No valid subtitles found in the uploaded file."
         )
 
+    # Compute subtitle duration from parsed segments
+    subtitle_duration = 0.0
+    if parsed_segments:
+        subtitle_duration = max(seg.get("end", 0.0) for seg in parsed_segments)
+        subtitle_duration = round(subtitle_duration + 0.5, 2)
+
     project.captions = parsed_segments
+
+    # If the project duration is shorter than the subtitles (or if no custom video):
+    if not project.video_path or (project.duration or 0) < subtitle_duration:
+        project.duration = max(project.duration or 0.0, subtitle_duration)
+
+    # If project does not have a user video uploaded, default to Green Screen chroma key
+    cfg = dict(project.style_config or {})
+    if not project.video_path or project.video_filename == "sample_demo.mp4":
+        if "canvas_background_type" not in cfg:
+            cfg["canvas_background_type"] = "color"
+            cfg.setdefault("canvas_background_color", "#00FF00")
+            project.style_config = cfg
+
     db.commit()
     db.refresh(project)
 
     return {
         "message": f"Imported {len(parsed_segments)} caption segments",
-        "captions": parsed_segments
+        "captions": parsed_segments,
+        "duration": project.duration,
+        "format": ext.replace(".", "").upper(),
+        "segment_count": len(parsed_segments)
     }
 
 @router.post("/{project_id}/subtitles")

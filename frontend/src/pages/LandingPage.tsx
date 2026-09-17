@@ -76,7 +76,7 @@ export const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <section className="relative pt-24 pb-20 px-6 overflow-hidden flex flex-col items-center text-center">
         {/* Glow ambient background */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-gradient-to-tr from-sky-600/15 via-indigo-600/20 to-purple-600/10 blur-[130px] pointer-events-none rounded-full" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-87.5 bg-linear-to-tr from-sky-600/15 via-indigo-600/20 to-purple-600/10 blur-[130px] pointer-events-none rounded-full" />
 
         {/* Pill Tag */}
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-900/80 border border-slate-800 text-sky-400 text-xs font-semibold mb-6 shadow-sm">
@@ -85,7 +85,7 @@ export const LandingPage: React.FC = () => {
         </div>
 
         {/* Main Hero Title */}
-        <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-balance bg-gradient-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+        <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold tracking-tight max-w-4xl text-balance bg-linear-to-b from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
           Create Professional Captions in Minutes
         </h1>
 
@@ -98,7 +98,7 @@ export const LandingPage: React.FC = () => {
         <div className="mt-8 flex flex-col sm:flex-row items-center gap-3.5">
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 flex items-center justify-center gap-2 transition hover:scale-105 cursor-pointer"
+            className="w-full sm:w-auto px-7 py-3.5 rounded-xl bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 flex items-center justify-center gap-2 transition hover:scale-105 cursor-pointer"
           >
             <Upload className="w-4 h-4" />
             <span>Create Captions</span>
@@ -281,7 +281,7 @@ export const LandingPage: React.FC = () => {
           </p>
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="px-8 py-3.5 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 inline-flex items-center gap-2 transition hover:scale-105 cursor-pointer"
+            className="px-8 py-3.5 rounded-xl bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-sm shadow-xl shadow-sky-500/25 inline-flex items-center gap-2 transition hover:scale-105 cursor-pointer"
           >
             <span>Create Captions Now</span>
             <ArrowRight className="w-4 h-4" />

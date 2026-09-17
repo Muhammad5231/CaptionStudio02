@@ -80,7 +80,14 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   future: [],
 
   setCurrentView: (view) => set({ currentView: view }),
-  setCurrentProject: (project) => set({ currentProject: project, history: [], future: [] }),
+  setCurrentProject: (project) => {
+    let dur = project?.duration || 0;
+    if (project?.captions && project.captions.length > 0) {
+      const maxCapEnd = Math.max(...project.captions.map((c) => c.end || 0));
+      if (maxCapEnd > dur) dur = Math.round((maxCapEnd + 0.5) * 10) / 10;
+    }
+    set({ currentProject: project, duration: dur, history: [], future: [] });
+  },
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (dur) => set({ duration: dur }),
   setIsPlaying: (playing) => set({ isPlaying: playing }),
@@ -101,10 +108,24 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   },
 
   setCaptions: (captions) => {
-    const { currentProject, pushHistory } = get();
+    const { currentProject, pushHistory, duration } = get();
     if (!currentProject) return;
     pushHistory();
-    set({ currentProject: { ...currentProject, captions } });
+    let updatedDuration = duration;
+    if (captions && captions.length > 0) {
+      const maxCapEnd = Math.max(...captions.map((c) => c.end || 0));
+      if (maxCapEnd > updatedDuration) {
+        updatedDuration = Math.round((maxCapEnd + 0.5) * 10) / 10;
+      }
+    }
+    set({
+      currentProject: {
+        ...currentProject,
+        captions,
+        duration: Math.max(currentProject.duration || 0, updatedDuration)
+      },
+      duration: updatedDuration,
+    });
     get().saveProject();
   },
 

@@ -113,7 +113,7 @@ export const DashboardPage: React.FC = () => {
 
             <button
               onClick={() => setUploadModalOpen(true)}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 transition flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
+              className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 transition flex items-center gap-1.5 cursor-pointer hover:scale-[1.02]"
             >
               <Plus className="w-4 h-4" />
               <span>Create New Caption</span>

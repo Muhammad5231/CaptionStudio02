@@ -165,7 +165,7 @@ export const UploadModal: React.FC = () => {
           /* Upload Card */
           <div className="flex flex-col items-center text-center space-y-6">
             <div>
-              <div className="w-12 h-12 mx-auto rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white mb-3 shadow-lg shadow-sky-500/20">
+              <div className="w-12 h-12 mx-auto rounded-2xl bg-linear-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white mb-3 shadow-lg shadow-sky-500/20">
                 <Video className="w-6 h-6" />
               </div>
               <h2 className="text-xl font-bold text-white">Upload Your Video</h2>

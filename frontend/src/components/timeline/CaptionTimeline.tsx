@@ -138,7 +138,7 @@ export const CaptionTimeline: React.FC = () => {
                   }
                 }}
                 disabled={isTranscribing}
-                className="px-4 py-2 rounded-xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
+                className="px-4 py-2 rounded-xl bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-sky-500/20 flex items-center gap-2 transition cursor-pointer disabled:opacity-50"
               >
                 {isTranscribing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
                 <span>{isTranscribing ? "Generating AI Captions..." : "Generate AI Captions Now"}</span>

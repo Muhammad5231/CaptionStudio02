@@ -60,18 +60,20 @@ class FFmpegWrapper:
 
     async def render_video_with_ass(
         self,
-        input_video: str,
+        input_video: Optional[str],
         ass_subtitles_path: str,
         output_video: str,
         target_resolution: str = "1080p",
+        background_color: Optional[str] = None,
+        target_duration: Optional[float] = None,
+        aspect_ratio: str = "9:16",
         progress_callback: Optional[Callable[[int, str], None]] = None
     ) -> bool:
         """
         Renders the video with burned-in ASS subtitles using FFmpeg libass filter.
-        Tracks real-time progress.
+        Supports both existing videos (with auto-loop if subtitles exceed video length)
+        and synthesized Chroma Key / Solid Color backgrounds (e.g. #00FF00 Green Screen).
         """
-        # Escape path for FFmpeg filter on Windows
-        # ASS filter format: ass='filename.ass'
         clean_ass_path = ass_subtitles_path.replace("\\", "/").replace(":", "\\:")
         
         fonts_dir = settings.BASE_DIR / "assets" / "fonts"
@@ -79,43 +81,87 @@ class FFmpegWrapper:
         if fonts_dir.exists():
             clean_fonts_dir = str(fonts_dir).replace("\\", "/").replace(":", "\\:")
             fonts_param = f":fontsdir='{clean_fonts_dir}'"
-        
-        # Probe dimensions and duration for scaling and progress
-        probe = self.probe_video(input_video)
-        src_w = probe.get("width", 1920)
-        src_h = probe.get("height", 1080)
-        total_duration = max(1.0, probe.get("duration", 10.0))
 
-        # Resolution filter: maintain aspect ratio correctly for portrait vs landscape
-        scale_filter = ""
-        if target_resolution == "720p":
-            scale_filter = "scale=720:-2," if src_h > src_w else "scale=-2:720,"
-        elif target_resolution == "1080p":
-            if src_h > src_w and src_w != 1080:
-                scale_filter = "scale=1080:-2,"
-            elif src_h <= src_w and src_h != 1080:
-                scale_filter = "scale=-2:1080,"
+        # Check if we should render Chroma / Solid Color background
+        use_chroma = bool(background_color) or not input_video or not Path(input_video).exists()
 
-        video_filter = f"{scale_filter}ass='{clean_ass_path}'{fonts_param}"
+        if use_chroma:
+            # Chroma Key / Solid background mode (Green Screen, Black, Blue, etc.)
+            clean_hex = (background_color or "#00FF00").strip().lstrip("#")
+            if len(clean_hex) == 3:
+                clean_hex = "".join([c * 2 for c in clean_hex])
+            color_val = f"0x{clean_hex.upper()}"
 
-        cmd = [
-            self.ffmpeg_bin,
-            "-y",
-            "-nostats",
-            "-loglevel", "error",
-            "-i", input_video,
-            "-vf", video_filter,
-            "-map", "0:v",
-            "-map", "0:a?",
-            "-c:v", "libx264",
-            "-preset", "fast",
-            "-crf", "20",
-            "-c:a", "aac",
-            "-b:a", "192k",
-            "-pix_fmt", "yuv420p",
-            "-progress", "pipe:1",
-            output_video
-        ]
+            # Calculate canvas dimensions based on aspect ratio
+            if aspect_ratio == "9:16":
+                w, h = (1080, 1920) if target_resolution != "720p" else (720, 1280)
+            elif aspect_ratio == "16:9":
+                w, h = (1920, 1080) if target_resolution != "720p" else (1280, 720)
+            else:  # 1:1
+                w, h = (1080, 1080) if target_resolution != "720p" else (720, 720)
+
+            total_duration = max(1.0, target_duration or 10.0)
+            video_filter = f"ass='{clean_ass_path}'{fonts_param}"
+
+            cmd = [
+                self.ffmpeg_bin,
+                "-y",
+                "-nostats",
+                "-loglevel", "error",
+                "-f", "lavfi",
+                "-i", f"color=c={color_val}:s={w}x{h}:d={total_duration}:r=30",
+                "-vf", video_filter,
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "20",
+                "-pix_fmt", "yuv420p",
+                "-progress", "pipe:1",
+                output_video
+            ]
+        else:
+            # Video background mode
+            probe = self.probe_video(input_video)
+            src_w = probe.get("width", 1920)
+            src_h = probe.get("height", 1080)
+            vid_duration = max(1.0, probe.get("duration", 10.0))
+            total_duration = max(vid_duration, target_duration or vid_duration)
+
+            scale_filter = ""
+            if target_resolution == "720p":
+                scale_filter = "scale=720:-2," if src_h > src_w else "scale=-2:720,"
+            elif target_resolution == "1080p":
+                if src_h > src_w and src_w != 1080:
+                    scale_filter = "scale=1080:-2,"
+                elif src_h <= src_w and src_h != 1080:
+                    scale_filter = "scale=-2:1080,"
+
+            video_filter = f"{scale_filter}ass='{clean_ass_path}'{fonts_param}"
+
+            input_args = []
+            if total_duration > (vid_duration + 0.5):
+                # Subtitles are longer than video: loop input video up to full subtitle duration
+                input_args = ["-stream_loop", "-1", "-i", input_video, "-t", str(round(total_duration, 2))]
+            else:
+                input_args = ["-i", input_video]
+
+            cmd = [
+                self.ffmpeg_bin,
+                "-y",
+                "-nostats",
+                "-loglevel", "error",
+                *input_args,
+                "-vf", video_filter,
+                "-map", "0:v",
+                "-map", "0:a?",
+                "-c:v", "libx264",
+                "-preset", "fast",
+                "-crf", "20",
+                "-c:a", "aac",
+                "-b:a", "192k",
+                "-pix_fmt", "yuv420p",
+                "-progress", "pipe:1",
+                output_video
+            ]
 
         if progress_callback:
             progress_callback(10, "Starting video encoder...")

@@ -27,11 +27,11 @@ export const Header: React.FC = () => {
           onClick={() => setCurrentView('landing')}
           className="flex items-center gap-2.5 group cursor-pointer focus:outline-none"
         >
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 rounded-xl bg-linear-to-tr from-sky-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
             <Sparkles className="w-5 h-5 text-white" />
           </div>
           <div className="flex flex-col text-left">
-            <span className="font-bold text-lg tracking-tight bg-gradient-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
+            <span className="font-bold text-lg tracking-tight bg-linear-to-r from-white via-slate-100 to-slate-400 bg-clip-text text-transparent">
               CaptionStudio
             </span>
             <span className="text-[10px] text-sky-400 font-medium tracking-wide uppercase -mt-1">
@@ -136,7 +136,7 @@ export const Header: React.FC = () => {
             {/* Export CTA */}
             <button
               onClick={() => setExportModalOpen(true)}
-              className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
+              className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
             >
               <Download className="w-4 h-4" />
               <span>Export</span>
@@ -147,7 +147,7 @@ export const Header: React.FC = () => {
         {currentView !== 'editor' && (
           <button
             onClick={() => setUploadModalOpen(true)}
-            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-pointer"
+            className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-pointer"
           >
             <Video className="w-4 h-4" />
             <span>Create Captions</span>

@@ -14,6 +14,8 @@ export const ExportModal: React.FC = () => {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   const [hasDownloaded, setHasDownloaded] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
 
   const pollIntervalRef = useRef<any>(null);
 
@@ -26,11 +28,72 @@ export const ExportModal: React.FC = () => {
 
   if (!isExportModalOpen || !currentProject) return null;
 
+  const saveBlobLocally = (blob: Blob, filename: string) => {
+    const blobUrl = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.setAttribute('download', filename);
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => {
+      window.URL.revokeObjectURL(blobUrl);
+    }, 15000);
+  };
+
+  const handleTriggerDownload = async () => {
+    if (!job) return;
+    setIsDownloading(true);
+    setDownloadError(null);
+
+    const filename =
+      job.output_filename ||
+      job.output_url?.split('/').pop() ||
+      `captionstudio_${job.id.slice(0, 8)}.mp4`;
+
+    try {
+      // 1. Fetch file into client memory as Blob
+      // Static media URL (/api/media/renders/...) is the most reliable endpoint
+      const targetUrl = job.output_url || `/api/download/${job.id}`;
+      const response = await fetch(targetUrl);
+
+      if (!response.ok) {
+        // Fallback to /api/download/:id
+        const fallbackRes = await fetch(`/api/download/${job.id}`);
+        if (!fallbackRes.ok) {
+          throw new Error(`Download request returned ${fallbackRes.status}`);
+        }
+        const blob = await fallbackRes.blob();
+        saveBlobLocally(blob, filename);
+      } else {
+        const blob = await response.blob();
+        saveBlobLocally(blob, filename);
+      }
+
+      setHasDownloaded(true);
+    } catch (err: any) {
+      console.error('Blob download error, falling back to direct browser link:', err);
+      setDownloadError('Direct save failed. Opening download stream...');
+      const a = document.createElement('a');
+      a.href = job.output_url || `/api/download/${job.id}`;
+      a.download = filename;
+      a.target = '_blank';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setHasDownloaded(true);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   const handleStartExport = async () => {
     try {
       setIsExporting(true);
       setErrorMsg(null);
       setHasDownloaded(false);
+      setDownloadError(null);
 
       const newJob = await api.startExport(currentProject.id, quality, captionQuality);
       setJob(newJob);
@@ -63,6 +126,7 @@ export const ExportModal: React.FC = () => {
     setIsExporting(false);
     setJob(null);
     setHasDownloaded(false);
+    setDownloadError(null);
     setUploadModalOpen(true);
   };
 
@@ -219,21 +283,27 @@ export const ExportModal: React.FC = () => {
             </div>
 
             <div className="w-full space-y-3 pt-2">
-              {/* Primary Download Anchor Button */}
-              <a
-                href={`/api/download/${job.id}`}
-                download={job.output_filename || job.output_url?.split('/').pop() || `captionstudio_${job.id.slice(0, 8)}.mp4`}
-                onClick={() => setHasDownloaded(true)}
-                className={`w-full py-3.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer no-underline select-none ${
-                  hasDownloaded
+              {/* Primary Download Button with in-browser blob buffer */}
+              <button
+                onClick={handleTriggerDownload}
+                disabled={isDownloading}
+                className={`w-full py-3.5 rounded-xl font-bold text-xs shadow-lg flex items-center justify-center gap-2 transition hover:scale-[1.01] cursor-pointer select-none ${
+                  isDownloading
+                    ? 'bg-sky-600 text-white shadow-sky-500/20'
+                    : hasDownloaded
                     ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-500'
                     : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
                 }`}
               >
-                {hasDownloaded ? (
+                {isDownloading ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin text-white" />
+                    <span>Saving video to your computer...</span>
+                  </>
+                ) : hasDownloaded ? (
                   <>
                     <CheckCircle2 className="w-4 h-4 text-emerald-200" />
-                    <span>Download Started! Click to download again</span>
+                    <span>Saved to your computer! Click to download again</span>
                   </>
                 ) : (
                   <>
@@ -241,7 +311,11 @@ export const ExportModal: React.FC = () => {
                     <span>Download Video (MP4)</span>
                   </>
                 )}
-              </a>
+              </button>
+
+              {downloadError && (
+                <p className="text-[11px] text-amber-400 text-center font-medium">{downloadError}</p>
+              )}
 
               {/* Watch / Preview Video Button */}
               {job.output_url && (
@@ -249,7 +323,7 @@ export const ExportModal: React.FC = () => {
                   href={job.output_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 text-xs font-semibold border border-slate-800 flex items-center justify-center gap-2 transition no-underline"
+                  className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-sky-400 text-xs font-semibold border border-slate-800 flex items-center justify-center gap-2 transition no-underline cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5" />
                   <span>Preview Video in New Tab</span>
@@ -262,9 +336,9 @@ export const ExportModal: React.FC = () => {
                   <a
                     href={job.output_url}
                     download={job.output_filename || job.output_url?.split('/').pop() || `captionstudio_${job.id.slice(0, 8)}.mp4`}
-                    className="text-[11px] text-slate-400 hover:text-slate-200 underline font-medium"
+                    className="text-[11px] text-slate-400 hover:text-slate-200 underline font-medium cursor-pointer"
                   >
-                    Direct static link (right-click &quot;Save link as&quot;)
+                    Direct file link (right-click &quot;Save link as&quot;)
                   </a>
                 </div>
               )}

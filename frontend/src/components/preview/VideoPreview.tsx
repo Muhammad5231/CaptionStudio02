@@ -353,7 +353,7 @@ export const VideoPreview: React.FC = () => {
               </button>
 
               {showSpeedMenu && (
-                <div className="absolute bottom-full right-0 mb-2 py-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 flex flex-col min-w-[70px]">
+                <div className="absolute bottom-full right-0 mb-2 py-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl z-50 flex flex-col min-w-17.5">
                   {[0.5, 1, 1.25, 1.5, 2].map((rate) => (
                     <button
                       key={rate}

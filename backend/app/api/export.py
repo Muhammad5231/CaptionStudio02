@@ -22,8 +22,12 @@ async def create_export_job(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    if not project.video_path or not Path(project.video_path).exists():
-        raise HTTPException(status_code=400, detail="Project has no valid uploaded video to render.")
+    cfg = project.style_config or {}
+    bg_type = cfg.get("canvas_background_type", "video")
+    has_video = project.video_path and Path(project.video_path).exists()
+
+    if not has_video and bg_type != "color" and not project.captions:
+        raise HTTPException(status_code=400, detail="Project has no valid video or captions to render.")
 
     # Create Job record
     job = job_manager.create_job(db, project_id)

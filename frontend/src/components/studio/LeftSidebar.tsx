@@ -31,6 +31,7 @@ export const LeftSidebar: React.FC = () => {
     mergeSegmentWithNext,
     addSegment,
     setCaptions,
+    setDuration,
     activeLeftTab,
     setActiveLeftTab,
   } = useProjectStore();
@@ -106,7 +107,10 @@ export const LeftSidebar: React.FC = () => {
       const result = await api.importSubtitles(currentProject.id, file);
       if (result.captions && result.captions.length > 0) {
         setCaptions(result.captions);
-        setImportStatus(`Successfully imported ${result.segment_count} segments (${result.format.toUpperCase()})`);
+        if (result.duration) {
+          setDuration(result.duration);
+        }
+        setImportStatus(`Successfully imported ${result.segment_count} segments (${(result.format || 'SRT').toUpperCase()})`);
         setActiveLeftTab('transcript');
       } else {
         setImportError('No subtitle segments found in file.');
@@ -155,7 +159,7 @@ export const LeftSidebar: React.FC = () => {
   };
 
   return (
-    <aside className="w-[380px] min-w-[340px] max-w-[420px] h-full flex flex-col border-r border-slate-800/80 bg-slate-950/70 backdrop-blur-md select-none">
+    <aside className="w-95 min-w-85 max-w-105 h-full flex flex-col border-r border-slate-800/80 bg-slate-950/70 backdrop-blur-md select-none">
       {/* 3 Tab Switcher */}
       <div className="flex border-b border-slate-800/80 bg-slate-900/50 p-1.5 gap-1">
         <button
@@ -482,7 +486,7 @@ export const LeftSidebar: React.FC = () => {
             <button
               onClick={handleTranslate}
               disabled={isTranslating || captions.length === 0}
-              className="w-full py-2.5 rounded-xl font-bold text-xs bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer disabled:opacity-50"
+              className="w-full py-2.5 rounded-xl font-bold text-xs bg-linear-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-slate-950 flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition cursor-pointer disabled:opacity-50"
             >
               {isTranslating ? (
                 <>

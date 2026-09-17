@@ -68,10 +68,11 @@ export const api = {
   },
 
   async importSubtitles(id: string, file: File): Promise<{
-    success: boolean;
+    success?: boolean;
     format: string;
     segment_count: number;
     captions: any[];
+    duration?: number;
   }> {
     const formData = new FormData();
     formData.append('file', file);
