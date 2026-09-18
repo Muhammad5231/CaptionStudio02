@@ -5,11 +5,12 @@ import { Download, X, CheckCircle2, AlertCircle, RefreshCw, Film, ExternalLink }
 import type { ExportJob } from '../../types/caption';
 
 export const ExportModal: React.FC = () => {
-  const { currentProject, isExportModalOpen, setExportModalOpen, setUploadModalOpen } = useProjectStore();
+  const { currentProject, isExportModalOpen, setExportModalOpen, setUploadModalOpen, activeTrackId } = useProjectStore();
 
   const [quality, setQuality] = useState<'1080p' | '720p' | 'original'>('1080p');
   const [captionQuality, setCaptionQuality] = useState<'high' | 'standard'>('high');
   const [isExporting, setIsExporting] = useState(false);
+  const [isCancelling, setIsCancelling] = useState(false);
   const [job, setJob] = useState<ExportJob | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -95,7 +96,7 @@ export const ExportModal: React.FC = () => {
       setHasDownloaded(false);
       setDownloadError(null);
 
-      const newJob = await api.startExport(currentProject.id, quality, captionQuality);
+      const newJob = await api.startExport(currentProject.id, quality, captionQuality, activeTrackId || undefined);
       setJob(newJob);
 
       // Poll job status every 1.5 seconds
@@ -118,6 +119,22 @@ export const ExportModal: React.FC = () => {
     } catch (err: any) {
       setIsExporting(false);
       setErrorMsg(err.message || 'Failed to start export');
+    }
+  };
+
+  const handleCancelExport = async () => {
+    if (!job) return;
+    setIsCancelling(true);
+    try {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      await api.cancelJob(job.id);
+      setIsExporting(false);
+      setJob(null);
+    } catch (err: any) {
+      console.error('Cancel export failed:', err);
+      setErrorMsg(err.message || 'Failed to cancel render');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -265,6 +282,16 @@ export const ExportModal: React.FC = () => {
                 <span className="text-sky-400 font-bold">{job?.progress || 10}%</span>
               </div>
             </div>
+
+            {/* Cancel Button */}
+            <button
+              onClick={handleCancelExport}
+              disabled={isCancelling}
+              className="px-4 py-1.5 rounded-xl bg-slate-900 border border-slate-800 hover:bg-slate-800 text-slate-400 hover:text-rose-400 text-xs font-semibold transition cursor-pointer flex items-center gap-1.5"
+            >
+              <X className="w-3.5 h-3.5" />
+              <span>{isCancelling ? 'Cancelling...' : 'Cancel Render'}</span>
+            </button>
           </div>
         )}
 

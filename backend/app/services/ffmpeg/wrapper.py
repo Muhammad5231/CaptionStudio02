@@ -11,6 +11,8 @@ from app.core.config import settings
 class FFmpegWrapper:
     def __init__(self):
         self.ffmpeg_bin = settings.FFMPEG_PATH or "ffmpeg"
+        self._active_processes: Dict[str, subprocess.Popen] = {}
+        self._lock = threading.Lock()
 
     def probe_video(self, video_path: str) -> Dict[str, Any]:
         """Probes video file to extract width, height, duration, and fps."""
@@ -46,7 +48,6 @@ class FFmpegWrapper:
             cap.set(cv2.CAP_PROP_POS_FRAMES, frame_no)
             ret, frame = cap.read()
             if not ret:
-                # Fallback to first frame
                 cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 ret, frame = cap.read()
             if ret:
@@ -58,6 +59,25 @@ class FFmpegWrapper:
             pass
         return False
 
+    def cancel_render(self, job_id: str) -> bool:
+        """Cancels an ongoing FFmpeg process tree for the given job_id."""
+        with self._lock:
+            proc = self._active_processes.get(job_id)
+            if not proc:
+                return False
+            try:
+                if os.name == "nt":
+                    subprocess.run(
+                        ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                        capture_output=True,
+                        check=False
+                    )
+                else:
+                    proc.kill()
+                return True
+            except Exception:
+                return False
+
     async def render_video_with_ass(
         self,
         input_video: Optional[str],
@@ -67,12 +87,13 @@ class FFmpegWrapper:
         background_color: Optional[str] = None,
         target_duration: Optional[float] = None,
         aspect_ratio: str = "9:16",
+        job_id: Optional[str] = None,
         progress_callback: Optional[Callable[[int, str], None]] = None
     ) -> bool:
         """
         Renders the video with burned-in ASS subtitles using FFmpeg libass filter.
-        Supports both existing videos (with auto-loop if subtitles exceed video length)
-        and synthesized Chroma Key / Solid Color backgrounds (e.g. #00FF00 Green Screen).
+        Supports both existing videos and synthesized Chroma Key backgrounds.
+        Tracks running process for reliable job cancellation.
         """
         clean_ass_path = ass_subtitles_path.replace("\\", "/").replace(":", "\\:")
         
@@ -82,22 +103,19 @@ class FFmpegWrapper:
             clean_fonts_dir = str(fonts_dir).replace("\\", "/").replace(":", "\\:")
             fonts_param = f":fontsdir='{clean_fonts_dir}'"
 
-        # Check if we should render Chroma / Solid Color background
         use_chroma = bool(background_color) or not input_video or not Path(input_video).exists()
 
         if use_chroma:
-            # Chroma Key / Solid background mode (Green Screen, Black, Blue, etc.)
             clean_hex = (background_color or "#00FF00").strip().lstrip("#")
             if len(clean_hex) == 3:
                 clean_hex = "".join([c * 2 for c in clean_hex])
             color_val = f"0x{clean_hex.upper()}"
 
-            # Calculate canvas dimensions based on aspect ratio
             if aspect_ratio == "9:16":
                 w, h = (1080, 1920) if target_resolution != "720p" else (720, 1280)
             elif aspect_ratio == "16:9":
                 w, h = (1920, 1080) if target_resolution != "720p" else (1280, 720)
-            else:  # 1:1
+            else:
                 w, h = (1080, 1080) if target_resolution != "720p" else (720, 720)
 
             total_duration = max(1.0, target_duration or 10.0)
@@ -119,7 +137,6 @@ class FFmpegWrapper:
                 output_video
             ]
         else:
-            # Video background mode
             probe = self.probe_video(input_video)
             src_w = probe.get("width", 1920)
             src_h = probe.get("height", 1080)
@@ -139,7 +156,6 @@ class FFmpegWrapper:
 
             input_args = []
             if total_duration > (vid_duration + 0.5):
-                # Subtitles are longer than video: loop input video up to full subtitle duration
                 input_args = ["-stream_loop", "-1", "-i", input_video, "-t", str(round(total_duration, 2))]
             else:
                 input_args = ["-i", input_video]
@@ -179,6 +195,10 @@ class FFmpegWrapper:
                 creationflags=creation_flags
             )
 
+            if job_id:
+                with self._lock:
+                    self._active_processes[job_id] = process
+
             stderr_lines = []
             def _drain_stderr():
                 if process.stderr:
@@ -189,28 +209,33 @@ class FFmpegWrapper:
             err_thread = threading.Thread(target=_drain_stderr, daemon=True)
             err_thread.start()
 
-            # Parse progress stream in real time from stdout
-            if process.stdout:
-                for line in iter(process.stdout.readline, ''):
-                    line_str = line.strip()
-                    if line_str.startswith("out_time_us="):
-                        try:
-                            time_us = int(line_str.split("=")[1])
-                            curr_time = time_us / 1_000_000.0
-                            pct = min(98, int(15 + (curr_time / total_duration) * 80))
-                            if progress_callback:
-                                progress_callback(pct, f"Rendering captions... {pct}%")
-                        except (ValueError, IndexError):
-                            pass
+            try:
+                if process.stdout:
+                    for line in iter(process.stdout.readline, ''):
+                        line_str = line.strip()
+                        if line_str.startswith("out_time_us="):
+                            try:
+                                time_us = int(line_str.split("=")[1])
+                                curr_time = time_us / 1_000_000.0
+                                pct = min(98, int(15 + (curr_time / total_duration) * 80))
+                                if progress_callback:
+                                    progress_callback(pct, f"Rendering captions... {pct}%")
+                            except (ValueError, IndexError):
+                                pass
 
-                process.stdout.close()
+                    process.stdout.close()
 
-            process.wait()
-            err_thread.join(timeout=2.0)
+                # Timeout after 30 minutes to prevent zombie renders
+                process.wait(timeout=1800)
+                err_thread.join(timeout=2.0)
 
-            if process.returncode != 0:
-                err_msg = "".join(stderr_lines).strip()
-                raise RuntimeError(f"FFmpeg render failed: {err_msg[-400:] if err_msg else f'Exit code {process.returncode}'}")
+                if process.returncode != 0:
+                    err_msg = "".join(stderr_lines).strip()
+                    raise RuntimeError(f"FFmpeg render failed: {err_msg[-400:] if err_msg else f'Exit code {process.returncode}'}")
+            finally:
+                if job_id:
+                    with self._lock:
+                        self._active_processes.pop(job_id, None)
 
             return True
 
@@ -222,4 +247,3 @@ class FFmpegWrapper:
         return True
 
 ffmpeg_wrapper = FFmpegWrapper()
-

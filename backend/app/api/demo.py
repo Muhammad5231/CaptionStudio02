@@ -1,7 +1,7 @@
 import uuid
 import shutil
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.core.config import settings
@@ -67,8 +67,8 @@ def create_sample_project(db: Session = Depends(get_db)):
         style_config=preset,
         captions=SAMPLE_CAPTIONS,
         status="ready",
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow()
+        created_at=datetime.now(timezone.utc),
+        updated_at=datetime.now(timezone.utc)
     )
     db.add(project)
     db.commit()

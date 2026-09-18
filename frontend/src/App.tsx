@@ -1,15 +1,24 @@
 import React, { useEffect } from 'react';
 import { useProjectStore } from './store/useProjectStore';
 import { useThemeStore } from './store/useThemeStore';
+import { useAuthStore } from './store/useAuthStore';
 import { Header } from './components/common/Header';
 import { LandingPage } from './pages/LandingPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EditorPage } from './pages/EditorPage';
+import { AdminPage } from './pages/AdminPage';
 import { UploadModal } from './components/upload/UploadModal';
+import { AuthModal } from './components/auth/AuthModal';
 
 export const App: React.FC = () => {
   const { currentView } = useProjectStore();
   const { theme } = useThemeStore();
+  const { initAuth } = useAuthStore();
+
+  // Initialize Auth state from localStorage
+  useEffect(() => {
+    initAuth();
+  }, [initAuth]);
 
   // Sync theme class to document root
   useEffect(() => {
@@ -29,10 +38,14 @@ export const App: React.FC = () => {
         {currentView === 'landing' && <LandingPage />}
         {currentView === 'dashboard' && <DashboardPage />}
         {currentView === 'editor' && <EditorPage />}
+        {currentView === 'admin' && <AdminPage />}
       </main>
 
       {/* Global Upload & Transcription Modal */}
       <UploadModal />
+
+      {/* Global SaaS Auth Modal */}
+      <AuthModal />
     </div>
   );
 };

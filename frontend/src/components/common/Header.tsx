@@ -1,10 +1,26 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useThemeStore } from '../../store/useThemeStore';
-import { Sparkles, Undo2, Redo2, Download, Video, FolderKanban, Wand2, Sun, Moon } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
+import {
+  Sparkles,
+  Undo2,
+  Redo2,
+  Download,
+  Video,
+  FolderKanban,
+  Wand2,
+  Sun,
+  Moon,
+  Shield,
+  User as UserIcon,
+  LogOut,
+  ChevronDown,
+} from 'lucide-react';
 
 export const Header: React.FC = () => {
   const { theme, toggleTheme } = useThemeStore();
+  const { user, isAuthenticated, logout, setAuthModalOpen } = useAuthStore();
   const {
     currentView,
     setCurrentView,
@@ -18,6 +34,8 @@ export const Header: React.FC = () => {
     setUploadModalOpen,
     setAutoStyleOpen,
   } = useProjectStore();
+
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   return (
     <header className="h-16 border-b border-slate-800/80 bg-slate-950/90 backdrop-blur-md sticky top-0 z-40 px-4 md:px-6 flex items-center justify-between">
@@ -44,7 +62,7 @@ export const Header: React.FC = () => {
         <nav className="hidden md:flex items-center gap-1">
           <button
             onClick={() => setCurrentView('dashboard')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               currentView === 'dashboard'
                 ? 'bg-slate-800 text-sky-400 font-semibold'
                 : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
@@ -53,10 +71,11 @@ export const Header: React.FC = () => {
             <FolderKanban className="w-3.5 h-3.5" />
             Projects
           </button>
+
           {currentProject && (
             <button
               onClick={() => setCurrentView('editor')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 ${
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
                 currentView === 'editor'
                   ? 'bg-slate-800 text-sky-400 font-semibold'
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900'
@@ -64,6 +83,20 @@ export const Header: React.FC = () => {
             >
               <Video className="w-3.5 h-3.5" />
               Editor
+            </button>
+          )}
+
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setCurrentView('admin')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+                currentView === 'admin'
+                  ? 'bg-rose-500/15 text-rose-400 font-semibold border border-rose-500/30'
+                  : 'text-rose-400/80 hover:text-rose-300 hover:bg-rose-500/10'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              Admin
             </button>
           )}
         </nav>
@@ -126,7 +159,7 @@ export const Header: React.FC = () => {
             {/* AI Auto Style Recommendation */}
             <button
               onClick={() => setAutoStyleOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 transition flex items-center gap-1.5 cursor-pointer"
               title="Smart AI Style suggestions"
             >
               <Wand2 className="w-3.5 h-3.5" />
@@ -136,7 +169,7 @@ export const Header: React.FC = () => {
             {/* Export CTA */}
             <button
               onClick={() => setExportModalOpen(true)}
-              className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02]"
+              className="px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-linear-to-r from-sky-500 to-indigo-600 hover:from-sky-400 hover:to-indigo-500 shadow-md shadow-sky-500/20 flex items-center gap-1.5 transition-all hover:scale-[1.02] cursor-pointer"
             >
               <Download className="w-4 h-4" />
               <span>Export</span>
@@ -166,8 +199,88 @@ export const Header: React.FC = () => {
             <Moon className="w-4 h-4 text-indigo-400" />
           )}
         </button>
+
+        {/* Auth / Profile Area */}
+        {isAuthenticated && user ? (
+          <div className="relative">
+            <button
+              onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+              className="flex items-center gap-2 pl-2 pr-2.5 py-1 rounded-xl bg-slate-900 border border-slate-800 hover:border-slate-700 transition cursor-pointer"
+            >
+              <div className="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center font-bold text-xs">
+                {user.full_name ? user.full_name.charAt(0).toUpperCase() : user.email.charAt(0).toUpperCase()}
+              </div>
+              <div className="hidden lg:flex flex-col text-left">
+                <span className="text-xs font-medium text-slate-200 max-w-[100px] truncate">
+                  {user.full_name || user.email.split('@')[0]}
+                </span>
+              </div>
+              <span className="text-[10px] px-1.5 py-0.5 rounded uppercase font-bold tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20">
+                {user.tier}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+            </button>
+
+            {/* Dropdown Menu */}
+            {isUserMenuOpen && (
+              <div
+                className="absolute right-0 mt-2 w-56 rounded-2xl bg-slate-950 border border-slate-800 shadow-2xl p-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150"
+                onMouseLeave={() => setIsUserMenuOpen(false)}
+              >
+                <div className="px-3 py-2 border-b border-slate-800/80 mb-1">
+                  <p className="text-xs font-semibold text-white truncate">{user.full_name || 'User'}</p>
+                  <p className="text-[11px] text-slate-400 truncate">{user.email}</p>
+                </div>
+
+                {user.role === 'admin' && (
+                  <button
+                    onClick={() => {
+                      setCurrentView('admin');
+                      setIsUserMenuOpen(false);
+                    }}
+                    className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 transition cursor-pointer"
+                  >
+                    <Shield className="w-3.5 h-3.5" />
+                    <span>Admin Dashboard</span>
+                  </button>
+                )}
+
+                <button
+                  onClick={() => {
+                    setCurrentView('dashboard');
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-300 hover:bg-slate-900 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <FolderKanban className="w-3.5 h-3.5" />
+                  <span>My Projects</span>
+                </button>
+
+                <div className="my-1 border-t border-slate-800/80" />
+
+                <button
+                  onClick={() => {
+                    logout();
+                    setIsUserMenuOpen(false);
+                  }}
+                  className="w-full px-3 py-2 rounded-xl text-left text-xs font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 transition cursor-pointer"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setAuthModalOpen(true, 'login')}
+            className="px-3.5 py-1.5 rounded-xl text-xs font-semibold text-slate-200 bg-slate-900 border border-slate-800 hover:border-slate-700 hover:bg-slate-800 transition cursor-pointer flex items-center gap-1.5"
+          >
+            <UserIcon className="w-3.5 h-3.5 text-sky-400" />
+            <span>Sign In</span>
+          </button>
+        )}
       </div>
     </header>
   );
 };
-
