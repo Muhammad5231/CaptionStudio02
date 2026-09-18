@@ -1,87 +1,45 @@
 import uuid
-import time
 import asyncio
-import tempfile
-import traceback
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
 from sqlalchemy.orm import Session
 from app.core.config import settings
 from app.core.database import SessionLocal
-from app.models.models import ExportJobModel, ProjectModel, CaptionTrackModel, UsageRecordModel
+from app.models.models import ExportJobModel, ProjectModel
 from app.services.rendering.ass_generator import ass_generator
 from app.services.ffmpeg.wrapper import ffmpeg_wrapper
 
-def utc_now():
-    return datetime.now(timezone.utc)
-
 class JobManager:
     @staticmethod
-    def get_job(db: Session, job_id: str, user_id: Optional[str] = None) -> Optional[ExportJobModel]:
+    def get_job(db: Session, job_id: str) -> ExportJobModel:
         db.expire_all()
-        query = db.query(ExportJobModel).filter(ExportJobModel.id == job_id)
-        if user_id:
-            query = query.filter(ExportJobModel.user_id == user_id)
-        job = query.first()
+        job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
         if not job and len(job_id) >= 6:
-            short_query = db.query(ExportJobModel).filter(ExportJobModel.id.startswith(job_id))
-            if user_id:
-                short_query = short_query.filter(ExportJobModel.user_id == user_id)
-            job = short_query.first()
+            job = db.query(ExportJobModel).filter(ExportJobModel.id.startswith(job_id)).first()
         return job
 
     @staticmethod
-    def create_job(
-        db: Session,
-        project_id: str,
-        user_id: Optional[str] = None,
-        track_id: Optional[str] = None
-    ) -> ExportJobModel:
+    def create_job(db: Session, project_id: str) -> ExportJobModel:
         job = ExportJobModel(
             id=str(uuid.uuid4()),
-            user_id=user_id,
             project_id=project_id,
-            track_id=track_id,
             status="queued",
             progress=0,
-            current_stage="Queued in render queue...",
-            created_at=utc_now()
+            current_stage="Preparing your video...",
+            created_at=datetime.utcnow()
         )
         db.add(job)
         db.commit()
         db.refresh(job)
         return job
 
-    @staticmethod
-    def cancel_job(db: Session, job_id: str, user_id: Optional[str] = None) -> bool:
-        job = JobManager.get_job(db, job_id, user_id)
-        if not job:
-            return False
-
-        if job.status == "cancelled":
-            return True
-
-        if job.status in {"completed", "failed"}:
-            return False
-
-        job.cancel_requested = True
-        job.status = "cancelled"
-        job.current_stage = "Cancelled by user"
-        job.completed_at = utc_now()
-        db.commit()
-
-        # Signal FFmpeg wrapper to terminate subprocess
-        ffmpeg_wrapper.cancel_render(job.id)
-        return True
-
     @classmethod
     async def run_export_pipeline(cls, job_id: str, quality: str = "1080p"):
-        """Production background export execution pipeline."""
+        """Background asynchronous export task."""
         db = SessionLocal()
         try:
             job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-            if not job or job.status == "cancelled":
+            if not job:
                 return
 
             project = db.query(ProjectModel).filter(ProjectModel.id == job.project_id).first()
@@ -90,15 +48,6 @@ class JobManager:
                 job.error = "Project not found."
                 db.commit()
                 return
-
-            # Determine caption source: specific track vs project captions
-            captions_to_render = []
-            if job.track_id:
-                track = db.query(CaptionTrackModel).filter(CaptionTrackModel.id == job.track_id).first()
-                if track and track.segments:
-                    captions_to_render = track.segments
-            if not captions_to_render:
-                captions_to_render = project.captions or []
 
             cfg = dict(project.style_config or {})
             bg_type = cfg.get("canvas_background_type", "video")
@@ -110,40 +59,40 @@ class JobManager:
                 bg_type = "color"
                 bg_color = "#00FF00"
 
-            if not has_video and not captions_to_render:
+            if not has_video and not project.captions:
                 job.status = "failed"
                 job.error = "No video or subtitles available to export. Please add subtitles or upload a video."
                 db.commit()
                 return
 
+            # Compute total export duration from subtitles and project
             cap_duration = 0.0
-            if captions_to_render:
-                cap_duration = max((seg.get("end", 0.0) for seg in captions_to_render), default=0.0)
+            if project.captions:
+                cap_duration = max((seg.get("end", 0.0) for seg in project.captions), default=0.0)
                 cap_duration = round(cap_duration + 0.5, 2)
             total_duration = max(project.duration or 0.0, cap_duration)
             if total_duration <= 0.0:
                 total_duration = 10.0
 
-            # Stage 1: Initializing
+            # Stage 1: Preparing
             job.status = "processing"
             job.progress = 10
             job.current_stage = "Analyzing video & timing..."
-            job.started_at = utc_now()
             db.commit()
 
-            if job.cancel_requested:
-                job.status = "cancelled"
-                db.commit()
-                return
-
-            # Stage 2: Generate ASS Subtitles
+            # Stage 2: Generate ASS Subtitles in system temp directory to prevent watcher restarts
             job.progress = 25
             job.current_stage = "Generating caption styles..."
             db.commit()
 
+            import tempfile
+            import time
+            import traceback
+
             ass_filename = f"captionstudio_{job_id}.ass"
             ass_path = str(Path(tempfile.gettempdir()) / ass_filename)
 
+            # Dimensions for ASS coordinates
             if aspect_ratio == "9:16":
                 ass_w, ass_h = (1080, 1920)
             elif aspect_ratio == "16:9":
@@ -156,7 +105,7 @@ class JobManager:
                 ass_h = project.height or ass_h
             
             ass_content = ass_generator.generate(
-                captions=captions_to_render,
+                captions=project.captions or [],
                 style=project.style_config or {},
                 video_width=ass_w,
                 video_height=ass_h
@@ -166,7 +115,7 @@ class JobManager:
                 f.write(ass_content)
 
             # Stage 3: FFmpeg Video Render
-            out_filename = f"export_{job.project_id[:8]}_{int(time.time())}.mp4"
+            out_filename = f"export_{job.project_id[:8]}_{int(datetime.utcnow().timestamp())}.mp4"
             out_path = str(settings.RENDER_DIR / out_filename)
 
             last_update_time = [0.0]
@@ -174,19 +123,20 @@ class JobManager:
 
             def on_progress(pct: int, msg: str):
                 now = time.time()
+                # Throttle DB writes: only write if >= 2% change or 0.4s elapsed or 100%
                 if pct == 100 or abs(pct - last_pct[0]) >= 2 or (now - last_update_time[0]) >= 0.4:
                     last_update_time[0] = now
                     last_pct[0] = pct
                     try:
                         sub_db = SessionLocal()
                         j = sub_db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-                        if j and not j.cancel_requested:
+                        if j:
                             j.progress = pct
                             j.current_stage = msg
                             sub_db.commit()
                         sub_db.close()
-                    except Exception:
-                        pass
+                    except Exception as pe:
+                        print(f"[Warning] Failed to update progress in DB: {pe}")
 
             on_progress(35, "Rendering captions with FFmpeg...")
 
@@ -198,7 +148,6 @@ class JobManager:
                 background_color=bg_color if bg_type == "color" else None,
                 target_duration=total_duration,
                 aspect_ratio=aspect_ratio,
-                job_id=job_id,
                 progress_callback=on_progress
             )
 
@@ -208,19 +157,6 @@ class JobManager:
             except Exception:
                 pass
 
-            # Re-check cancellation after render
-            db.expire_all()
-            job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-            if job.cancel_requested:
-                job.status = "cancelled"
-                job.current_stage = "Cancelled"
-                try:
-                    Path(out_path).unlink(missing_ok=True)
-                except Exception:
-                    pass
-                db.commit()
-                return
-
             # Finalize
             job.status = "completed"
             job.progress = 100
@@ -228,50 +164,25 @@ class JobManager:
             job.output_filename = out_filename
             job.output_path = out_path
             job.output_url = f"/api/media/renders/{out_filename}"
-            job.completed_at = utc_now()
+            job.completed_at = datetime.utcnow()
             db.commit()
 
-            # Record usage metric if user_id attached
-            if job.user_id:
-                try:
-                    usage_dur = UsageRecordModel(
-                        user_id=job.user_id,
-                        metric="render_seconds",
-                        quantity=total_duration,
-                        details={"project_id": job.project_id, "quality": quality}
-                    )
-                    usage_exp = UsageRecordModel(
-                        user_id=job.user_id,
-                        metric="export_count",
-                        quantity=1.0,
-                        details={"project_id": job.project_id}
-                    )
-                    db.add(usage_dur)
-                    db.add(usage_exp)
-                    db.commit()
-                except Exception as ue:
-                    print(f"[Warning] Failed to record usage: {ue}")
-
         except asyncio.CancelledError:
+            print(f"[Export] Job {job_id} cancelled by server reload or shutdown")
             try:
-                job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-                if job:
-                    job.status = "cancelled"
-                    job.error = "Video export was cancelled."
-                    db.commit()
+                job.status = "failed"
+                job.error = "Video export was interrupted or cancelled. Please try again."
+                db.commit()
             except Exception:
                 pass
             raise
         except Exception as e:
             traceback.print_exc()
             err_msg = str(e).strip() or repr(e)
+            job.status = "failed"
+            job.error = f"We encountered an issue while finalizing your video: {err_msg}"
             try:
-                job = db.query(ExportJobModel).filter(ExportJobModel.id == job_id).first()
-                if job:
-                    job.status = "failed"
-                    job.error = f"We encountered an issue while finalizing your video: {err_msg}"
-                    job.completed_at = utc_now()
-                    db.commit()
+                db.commit()
             except Exception:
                 pass
         finally:

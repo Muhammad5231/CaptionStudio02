@@ -34,10 +34,6 @@ export const LeftSidebar: React.FC = () => {
     setDuration,
     activeLeftTab,
     setActiveLeftTab,
-    tracks,
-    activeTrackId,
-    switchTrack,
-    fetchTracks,
   } = useProjectStore();
 
   // Search & Filter
@@ -138,11 +134,7 @@ export const LeftSidebar: React.FC = () => {
       const res = await api.translateCaptions(currentProject.id, targetLang, sourceLang);
       if (res.captions && res.captions.length > 0) {
         setCaptions(res.captions);
-        setTranslateSuccessMsg(`Captions translated to ${targetLang.toUpperCase()} (${res.engine_used || 'Neural Engine'}). Saved as new track.`);
-        await fetchTracks(currentProject.id);
-        if (res.track_id) {
-          useProjectStore.getState().setActiveTrackId(res.track_id);
-        }
+        setTranslateSuccessMsg(`Captions translated to ${targetLang.toUpperCase()} (${res.engine_used || 'Neural Engine'})`);
       }
     } catch (err: any) {
       setImportError(err.message || 'Translation failed');
@@ -213,28 +205,6 @@ export const LeftSidebar: React.FC = () => {
       {/* TAB 1: TRANSCRIPT */}
       {activeLeftTab === 'transcript' && (
         <div className="flex-1 flex flex-col min-h-0">
-          {/* Caption Track Selector */}
-          {tracks && tracks.length > 0 && (
-            <div className="px-3 py-2 bg-slate-900/60 border-b border-slate-800/80 flex items-center justify-between text-xs">
-              <div className="flex items-center gap-1.5 text-slate-400">
-                <Languages className="w-3.5 h-3.5 text-sky-400" />
-                <span className="text-[11px] font-medium">Track:</span>
-              </div>
-              <select
-                value={activeTrackId || ''}
-                onChange={(e) => switchTrack(e.target.value)}
-                aria-label="Active Caption Track"
-                className="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1 text-[11px] font-semibold text-slate-200 focus:border-sky-500 outline-none max-w-[200px] truncate cursor-pointer"
-              >
-                {tracks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.language.toUpperCase()})
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
           {/* Sub-header with search and add segment */}
           <div className="p-3 border-b border-slate-800/60 flex items-center gap-2">
             <input

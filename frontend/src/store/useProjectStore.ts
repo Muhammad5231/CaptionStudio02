@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Project, CaptionSegment, StyleConfig, Word, CaptionTrack } from '../types/caption';
+import type { Project, CaptionSegment, StyleConfig, Word } from '../types/caption';
 import { api } from '../services/api';
 
 interface ProjectState {
@@ -17,18 +17,14 @@ interface ProjectState {
   isUploadModalOpen: boolean;
   isAutoStyleOpen: boolean;
   activeLeftTab: 'transcript' | 'import' | 'translate';
-  currentView: 'landing' | 'dashboard' | 'editor' | 'admin';
-
-  // Multilingual Tracks
-  tracks: CaptionTrack[];
-  activeTrackId: string | null;
+  currentView: 'landing' | 'dashboard' | 'editor';
 
   // History for Undo / Redo
   history: Project[];
   future: Project[];
 
   // Actions
-  setCurrentView: (view: 'landing' | 'dashboard' | 'editor' | 'admin') => void;
+  setCurrentView: (view: 'landing' | 'dashboard' | 'editor') => void;
   setCurrentProject: (project: Project | null) => void;
   setCurrentTime: (time: number) => void;
   setDuration: (dur: number) => void;
@@ -38,10 +34,6 @@ interface ProjectState {
   setActiveLeftTab: (tab: 'transcript' | 'import' | 'translate') => void;
   setAspectRatio: (ratio: '9:16' | '16:9' | '1:1') => void;
   setCaptions: (captions: CaptionSegment[]) => void;
-  setTracks: (tracks: CaptionTrack[]) => void;
-  setActiveTrackId: (id: string | null) => void;
-  fetchTracks: (projectId: string) => Promise<void>;
-  switchTrack: (trackId: string) => Promise<void>;
   
   // Modals / Drawers
   setCustomizeOpen: (open: boolean) => void;
@@ -83,60 +75,18 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   isAutoStyleOpen: false,
   activeLeftTab: 'transcript',
   currentView: 'landing',
-  tracks: [],
-  activeTrackId: null,
 
   history: [],
   future: [],
 
   setCurrentView: (view) => set({ currentView: view }),
-  setTracks: (tracks) => set({ tracks }),
-  setActiveTrackId: (id) => set({ activeTrackId: id }),
-
-  fetchTracks: async (projectId: string) => {
-    try {
-      const tracks = await api.getTracks(projectId);
-      set({ tracks });
-      const defaultTrack = tracks.find((t) => t.is_default) || tracks[0];
-      if (defaultTrack && !get().activeTrackId) {
-        set({ activeTrackId: defaultTrack.id });
-      }
-    } catch (err) {
-      console.warn('Failed to fetch caption tracks:', err);
-    }
-  },
-
-  switchTrack: async (trackId: string) => {
-    const { currentProject } = get();
-    if (!currentProject) return;
-    try {
-      const res = await api.activateTrack(currentProject.id, trackId);
-      if (res.captions) {
-        set({
-          activeTrackId: trackId,
-          currentProject: {
-            ...currentProject,
-            captions: res.captions,
-          },
-        });
-      }
-    } catch (err) {
-      console.error('Failed to switch track:', err);
-    }
-  },
-
   setCurrentProject: (project) => {
     let dur = project?.duration || 0;
     if (project?.captions && project.captions.length > 0) {
       const maxCapEnd = Math.max(...project.captions.map((c) => c.end || 0));
       if (maxCapEnd > dur) dur = Math.round((maxCapEnd + 0.5) * 10) / 10;
     }
-    set({ currentProject: project, duration: dur, history: [], future: [], activeTrackId: null });
-    if (project?.id) {
-      get().fetchTracks(project.id);
-    } else {
-      set({ tracks: [] });
-    }
+    set({ currentProject: project, duration: dur, history: [], future: [] });
   },
   setCurrentTime: (time) => set({ currentTime: time }),
   setDuration: (dur) => set({ duration: dur }),
