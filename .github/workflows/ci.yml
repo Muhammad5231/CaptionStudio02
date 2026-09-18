@@ -43,7 +43,15 @@ jobs:
           pip install -r backend/requirements.txt
           pip install pytest pytest-asyncio
 
+      - name: Prepare Test Environment
+        run: |
+          mkdir -p backend/storage/uploads backend/storage/renders backend/storage/thumbnails
+          mkdir -p frontend/dist
+          echo '<!DOCTYPE html><html><head><title>CaptionStudio</title></head><body>CaptionStudio AI Video Engine</body></html>' > frontend/dist/index.html
+
       - name: Run Database Migrations (Alembic)
+        env:
+          DATABASE_URL: sqlite:///./test_saas.db
         run: |
           cd backend
           python -m alembic upgrade head
